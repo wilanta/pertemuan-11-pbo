@@ -109,15 +109,15 @@ td.act{font-family:var(--sans);font-size:13px;white-space:nowrap}
   <div class="scroll">
     <table>
       <thead><tr><th>Bil 1</th><th class="c">Opt</th><th>Bil 2</th><th>Hasil</th><th>Aksi</th></tr></thead>
-      <tbody id="rows" th:remove="tag">
+      <tbody id="rows">
     <tr th:each="row : ${rows}" th:attr="data-id=${row.id}">
       <td th:text="${row.a}"></td>
       <td class="c" th:text="${row.op eq '+' ? '+' : (row.op eq '-' ? '−' : (row.op eq 'x' ? '×' : '÷'))}"></td>
       <td th:text="${row.b}"></td>
       <td class="res"></td>
       <td class="act">
-        <button class="link" th:attr="onclick='edit(${row.id})'">edit</button>
-        <button class="link del" th:attr="onclick='del(${row.id})'">hapus</button>
+        <button class="link" data-action="edit" data-id="${row.id}">edit</button>
+        <button class="link del" data-action="del" data-id="${row.id}">hapus</button>
       </td>
     </tr>
     <tr th:if="${#lists.isEmpty(rows)}"><td colspan="5" class="empty">Belum ada catatan.</td></tr>
@@ -188,7 +188,7 @@ async function submit(){
     const tr=document.createElement('tr');
     tr.dataset.id=saved.id;
     tr.innerHTML=`<td>${a}</td><td class="c">${SYM[op]}</td><td>${b}</td><td class="res">${result}</td>
-      <td class="act"><button class="link" onclick="edit(${saved.id})">edit</button><button class="link del" onclick="del(${saved.id})">hapus</button></td>`;
+      <td class="act"><button class="link" data-action="edit" data-id="${saved.id}">edit</button><button class="link del" data-action="del" data-id="${saved.id}">hapus</button></td>`;
     const emptyRow=$('rows').querySelector('tr .empty, td.empty');
     if(emptyRow){emptyRow.parentElement.remove()}
     $('rows').prepend(tr);
@@ -226,6 +226,13 @@ async function confirmDel(){
 $('modal-ok').addEventListener('click',confirmDel);
 $('modal-no').addEventListener('click',closeModal);
 $('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
+document.addEventListener('click',e=>{
+  const btn=e.target.closest('[data-action]');
+  if(!btn)return;
+  const id=btn.dataset.id;
+  if(btn.dataset.action==='edit')edit(id);
+  else if(btn.dataset.action==='del')del(id);
+});
 document.querySelectorAll('.op').forEach(b=>b.addEventListener('click',()=>setOp(b.dataset.op)));
 [$('a'),$('b')].forEach(el=>{el.addEventListener('keydown',e=>{if(e.key==='Enter')submit()})});
 $('eq').addEventListener('click',submit);
