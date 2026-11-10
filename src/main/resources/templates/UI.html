@@ -98,15 +98,26 @@ td.act{font-family:var(--sans);font-size:13px;white-space:nowrap}
   <div class="scroll">
     <table>
       <thead><tr><th>Bil 1</th><th class="c">Opt</th><th>Bil 2</th><th>Hasil</th><th>Aksi</th></tr></thead>
-      <tbody id="rows"></tbody>
+      <tbody id="rows" th:remove="tag">
+    <tr th:each="row : ${rows}" th:attr="data-id=${row.id}">
+      <td th:text="${row.a}"></td>
+      <td class="c" th:text="${row.op eq '+' ? '+' : (row.op eq '-' ? '−' : (row.op eq 'x' ? '×' : '÷'))}"></td>
+      <td th:text="${row.b}"></td>
+      <td class="res"></td>
+      <td class="act">
+        <button class="link" th:attr="onclick='edit(${row.id})'">edit</button>
+        <button class="link del" th:attr="onclick='del(${row.id})'">hapus</button>
+      </td>
+    </tr>
+    <tr th:if="${#lists.isEmpty(rows)}"><td colspan="5" class="empty">Belum ada catatan.</td></tr>
+  </tbody>
     </table>
   </div>
 </main>
 
 <script>
 const SYM={'+':'+','-':'−','x':'×','/':'÷'};
-let rows=[{id:1,a:7,op:'x',b:5},{id:2,a:1,op:'+',b:2}];
-let nextId=3,editId=null,op='+';
+let editId=null,op='+';
 const $=id=>document.getElementById(id);
 const calc=(a,o,b)=>o==='+'?a+b:o==='-'?a-b:o==='x'?a*b:a/b;
 const fmt=n=>String(parseFloat(n.toFixed(6)));
@@ -123,33 +134,64 @@ function reset(){
   editId=null;$('a').value='';$('b').value='';setOp('+');
   $('cancel').hidden=true;say(DEF);render();
 }
-function submit(){
+function render(){
+  const tbody=$('rows');
+  const dataRows=tbody.querySelectorAll('tr[data-id]');
+  $('count').textContent=dataRows.length+' baris';
+  dataRows.forEach(tr=>{
+    const a=parseFloat(tr.children[0].textContent);
+    const opSym=tr.children[1].textContent;
+    const opKey=Object.keys(SYM).find(k=>SYM[k]===opSym)||'+';
+    const b=parseFloat(tr.children[2].textContent);
+    tr.children[3].textContent=fmt(calc(a,opKey,b));
+  });
+}
+async function submit(){
   const a=parseFloat($('a').value),b=parseFloat($('b').value);
   if(isNaN(a)||isNaN(b)){say('Isi bilangan 1 dan bilangan 2 dulu.',true);return}
   if(op==='/'&&b===0){say('Tidak bisa membagi dengan nol.',true);return}
-  const upd=editId;
-  if(upd)rows=rows.map(r=>r.id===upd?{...r,a,op,b}:r);else rows.unshift({id:nextId++,a,op,b});
-  reset();say(upd?'Baris diperbarui.':'Tersimpan.');
+  const payload={a,op,b};
+  if(editId){
+    await fetch('/api/ops/'+editId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    say('Baris diperbarui.');
+    const tr=$('rows').querySelector(`tr[data-id="${editId}"]`);
+    if(tr){
+      tr.children[0].textContent=a;
+      tr.children[1].textContent=SYM[op];
+      tr.children[2].textContent=b;
+    }
+    reset();
+  }else{
+    const res=await fetch('/api/ops',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const saved=await res.json();
+    say('Tersimpan.');
+    const tr=document.createElement('tr');
+    tr.dataset.id=saved.id;
+    tr.innerHTML=`<td>${a}</td><td class="c">${SYM[op]}</td><td>${b}</td><td class="res">${fmt(calc(a,op,b))}</td>
+      <td class="act"><button class="link" onclick="edit(${saved.id})">edit</button><button class="link del" onclick="del(${saved.id})">hapus</button></td>`;
+    const emptyRow=$('rows').querySelector('tr .empty, td.empty');
+    if(emptyRow){emptyRow.parentElement.remove()}
+    $('rows').prepend(tr);
+    reset();
+  }
 }
-function edit(id){
-  const r=rows.find(x=>x.id===id);if(!r)return;
-  editId=id;$('a').value=r.a;$('b').value=r.b;setOp(r.op);
+async function edit(id){
+  const tr=$('rows').querySelector(`tr[data-id="${id}"]`);
+  if(!tr)return;
+  editId=id;
+  $('a').value=tr.children[0].textContent;
+  $('b').value=tr.children[2].textContent;
+  const opKey=Object.keys(SYM).find(k=>SYM[k]===tr.children[1].textContent)||'+';
+  setOp(opKey);
+  tr.classList.add('edit');
   $('cancel').hidden=false;say('Mengubah satu baris. Tekan = untuk memperbarui.');
-  render();$('a').focus();
+  $('a').focus();
 }
-function del(id){
-  rows=rows.filter(r=>r.id!==id);
-  if(editId===id)reset();else render();
-  say('Baris dihapus.');
-}
-function render(){
-  $('count').textContent=rows.length+' baris';
-  $('rows').innerHTML=rows.length?rows.map(r=>`
-    <tr class="${r.id===editId?'edit':''}">
-      <td>${r.a}</td><td class="c">${SYM[r.op]}</td><td>${r.b}</td>
-      <td class="res">${fmt(calc(r.a,r.op,r.b))}</td>
-      <td class="act"><button class="link" onclick="edit(${r.id})">edit</button><button class="link del" onclick="del(${r.id})">hapus</button></td>
-    </tr>`).join(''):'<tr><td colspan="5" class="empty">Belum ada catatan.</td></tr>';
+async function del(id){
+  await fetch('/api/ops/'+id,{method:'DELETE'});
+  const tr=$('rows').querySelector(`tr[data-id="${id}"]`);
+  if(tr)tr.remove();
+  if(editId===id)reset();else{say('Baris dihapus.');render()}
 }
 document.querySelectorAll('.op').forEach(b=>b.addEventListener('click',()=>setOp(b.dataset.op)));
 [$('a'),$('b')].forEach(el=>{el.addEventListener('input',live);el.addEventListener('keydown',e=>{if(e.key==='Enter')submit()})});
