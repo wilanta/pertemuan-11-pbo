@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Buku Hitung</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=Newsreader:opsz,wght@6..72,500;6..72,600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f2eee4;--ink:#1d1b16;--mute:#7a7567;--rule:#cfc8b6;--accent:#c4421c;--hi:#e9e2cf;
+  --serif:'Newsreader',Georgia,'Times New Roman',serif;--mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;--sans:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+  color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#171510;--ink:#ece6d6;--mute:#8d8776;--rule:#38342a;--accent:#ee7248;--hi:#221f17;color-scheme:dark}}
+:root[data-theme="dark"]{--paper:#171510;--ink:#ece6d6;--mute:#8d8776;--rule:#38342a;--accent:#ee7248;--hi:#221f17;color-scheme:dark}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--paper);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.5}
+main{max-width:720px;margin:0 auto;padding:40px 22px 80px}
+header{display:flex;justify-content:space-between;align-items:baseline;gap:16px;border-bottom:2px solid var(--ink);padding-bottom:14px}
+h1{font:600 34px/1 var(--serif);margin:0;letter-spacing:-.01em}
+header p{margin:6px 0 0;color:var(--mute);font-size:14px}
+button{font:inherit;color:inherit;cursor:pointer;background:none;border:0;padding:0}
+.theme{font:500 12px var(--mono);color:var(--mute);text-decoration:underline;text-underline-offset:3px}
+.theme:hover{color:var(--ink)}
+
+.eqn{display:flex;align-items:flex-end;gap:18px;margin-top:34px;flex-wrap:wrap}
+.f{display:block;flex:1 1 120px;min-width:0}
+.f span,.opsel>span{display:block;font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--mute);margin-bottom:4px}
+input{width:100%;font:500 40px/1.2 var(--mono);color:var(--ink);background:transparent;border:0;border-bottom:2px solid var(--ink);border-radius:0;padding:2px 0;outline:none;-moz-appearance:textfield}
+input::-webkit-outer-spin-button,input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+input::placeholder{color:var(--rule)}
+input:focus{border-bottom-color:var(--accent)}
+.ops{display:flex;gap:0}
+.op{width:42px;height:50px;border:2px solid var(--ink);margin-left:-2px;font:500 22px var(--mono);background:transparent}
+.op:first-child{margin-left:0}
+.op:hover{background:var(--hi)}
+.op.on{background:var(--ink);color:var(--paper)}
+.eq{width:62px;height:50px;background:var(--accent);color:#fff;border:2px solid var(--accent);font:500 30px/1 var(--mono)}
+.eq:hover{background:transparent;color:var(--accent)}
+.live{font:600 40px/1.2 var(--mono);min-width:110px;padding-bottom:2px;color:var(--mute)}
+.live.ok{color:var(--accent)}
+.hint{display:flex;gap:14px;align-items:center;margin:14px 0 0;min-height:22px;font-size:13px;color:var(--mute)}
+.hint .err{color:var(--accent);font-weight:600}
+.link{font-size:13px;text-decoration:underline;text-underline-offset:3px;color:var(--ink)}
+.link:hover{color:var(--accent)}
+
+.head{display:flex;justify-content:space-between;align-items:baseline;margin-top:48px}
+h2{font:600 22px var(--serif);margin:0}
+.count{font:400 12px var(--mono);color:var(--mute)}
+.scroll{overflow-x:auto;margin-top:10px}
+table{width:100%;border-collapse:collapse;min-width:440px}
+th{font:500 11px var(--mono);text-transform:uppercase;letter-spacing:.08em;color:var(--mute);text-align:right;padding:8px 10px;border-bottom:1px solid var(--ink)}
+th:first-child,td:first-child{padding-left:12px}
+td{font:500 18px var(--mono);text-align:right;padding:13px 10px;border-bottom:1px solid var(--rule)}
+th.c,td.c{text-align:center;color:var(--mute)}
+td.res{font-weight:600}
+tr.edit td{background:var(--hi)}
+tr.edit td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+td.act{font-family:var(--sans);font-size:13px;white-space:nowrap}
+.act button{margin-left:14px}
+.act .del{color:var(--accent)}
+.empty{text-align:center!important;font:400 14px var(--sans)!important;color:var(--mute);padding:34px 0!important}
+
+@media (max-width:560px){
+  h1{font-size:30px}
+  .eqn{gap:14px}
+  input,.live{font-size:32px}
+  .opsel{order:-1;flex-basis:100%}
+  .op{flex:1;width:auto}.ops{width:100%}
+}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <div><h1>Buku Hitung</h1><p>Catat operasi aritmatika. Tambah, ubah, hapus.</p></div>
+    <button class="theme" id="theme" type="button">tema</button>
+  </header>
+
+  <section class="eqn" aria-label="Form operasi">
+    <label class="f"><span>Bil 1</span><input id="a" type="number" step="any" placeholder="0"></label>
+    <div class="opsel"><span>Opt</span>
+      <div class="ops" id="ops">
+        <button class="op on" data-op="+" type="button">+</button>
+        <button class="op" data-op="-" type="button">−</button>
+        <button class="op" data-op="x" type="button">×</button>
+        <button class="op" data-op="/" type="button">÷</button>
+      </div>
+    </div>
+    <label class="f"><span>Bil 2</span><input id="b" type="number" step="any" placeholder="0"></label>
+    <button class="eq" id="eq" type="button" aria-label="Hitung dan simpan">=</button>
+    <div class="live" id="live">?</div>
+  </section>
+  <div class="hint"><span id="hint">Tekan = untuk menghitung dan menyimpan.</span><button class="link" id="cancel" type="button" hidden>batal</button></div>
+
+  <div class="head"><h2>Riwayat</h2><span class="count" id="count"></span></div>
+  <div class="scroll">
+    <table>
+      <thead><tr><th>Bil 1</th><th class="c">Opt</th><th>Bil 2</th><th>Hasil</th><th>Aksi</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+const SYM={'+':'+','-':'−','x':'×','/':'÷'};
+let rows=[{id:1,a:7,op:'x',b:5},{id:2,a:1,op:'+',b:2}];
+let nextId=3,editId=null,op='+';
+const $=id=>document.getElementById(id);
+const calc=(a,o,b)=>o==='+'?a+b:o==='-'?a-b:o==='x'?a*b:a/b;
+const fmt=n=>String(parseFloat(n.toFixed(6)));
+const DEF='Tekan = untuk menghitung dan menyimpan.';
+
+function say(t,err){const h=$('hint');h.textContent=t;h.className=err?'err':''}
+function setOp(o){op=o;document.querySelectorAll('.op').forEach(b=>b.classList.toggle('on',b.dataset.op===o));live()}
+function live(){
+  const a=parseFloat($('a').value),b=parseFloat($('b').value),el=$('live');
+  const ok=!isNaN(a)&&!isNaN(b)&&!(op==='/'&&b===0);
+  el.textContent=ok?fmt(calc(a,op,b)):'?';el.classList.toggle('ok',ok);
+}
+function reset(){
+  editId=null;$('a').value='';$('b').value='';setOp('+');
+  $('cancel').hidden=true;say(DEF);render();
+}
+function submit(){
+  const a=parseFloat($('a').value),b=parseFloat($('b').value);
+  if(isNaN(a)||isNaN(b)){say('Isi bilangan 1 dan bilangan 2 dulu.',true);return}
+  if(op==='/'&&b===0){say('Tidak bisa membagi dengan nol.',true);return}
+  const upd=editId;
+  if(upd)rows=rows.map(r=>r.id===upd?{...r,a,op,b}:r);else rows.unshift({id:nextId++,a,op,b});
+  reset();say(upd?'Baris diperbarui.':'Tersimpan.');
+}
+function edit(id){
+  const r=rows.find(x=>x.id===id);if(!r)return;
+  editId=id;$('a').value=r.a;$('b').value=r.b;setOp(r.op);
+  $('cancel').hidden=false;say('Mengubah satu baris. Tekan = untuk memperbarui.');
+  render();$('a').focus();
+}
+function del(id){
+  rows=rows.filter(r=>r.id!==id);
+  if(editId===id)reset();else render();
+  say('Baris dihapus.');
+}
+function render(){
+  $('count').textContent=rows.length+' baris';
+  $('rows').innerHTML=rows.length?rows.map(r=>`
+    <tr class="${r.id===editId?'edit':''}">
+      <td>${r.a}</td><td class="c">${SYM[r.op]}</td><td>${r.b}</td>
+      <td class="res">${fmt(calc(r.a,r.op,r.b))}</td>
+      <td class="act"><button class="link" onclick="edit(${r.id})">edit</button><button class="link del" onclick="del(${r.id})">hapus</button></td>
+    </tr>`).join(''):'<tr><td colspan="5" class="empty">Belum ada catatan.</td></tr>';
+}
+document.querySelectorAll('.op').forEach(b=>b.addEventListener('click',()=>setOp(b.dataset.op)));
+[$('a'),$('b')].forEach(el=>{el.addEventListener('input',live);el.addEventListener('keydown',e=>{if(e.key==='Enter')submit()})});
+$('eq').addEventListener('click',submit);
+$('cancel').addEventListener('click',reset);
+$('theme').addEventListener('click',()=>{
+  const r=document.documentElement;
+  const dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
+  r.dataset.theme=dark?'light':'dark';
+});
+render();
+</script>
+</body>
+</html>
