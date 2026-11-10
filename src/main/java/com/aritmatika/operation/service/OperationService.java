@@ -13,7 +13,9 @@ public class OperationService {
     OperationRepository repo;
 
     public List<Operation> getAll() {
-        return repo.findAll();
+        List<Operation> all = repo.findAll();
+        all.sort((x, y) -> y.getId().compareTo(x.getId()));
+        return all;
     }
 
     public Operation save(Operation op) {

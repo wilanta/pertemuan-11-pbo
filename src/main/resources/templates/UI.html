@@ -62,6 +62,17 @@ td.act{font-family:var(--sans);font-size:13px;white-space:nowrap}
 .act .del{color:var(--accent)}
 .empty{text-align:center!important;font:400 14px var(--sans)!important;color:var(--mute);padding:34px 0!important}
 
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;z-index:100}
+.modal{background:var(--paper);border:2px solid var(--ink);padding:28px 32px;max-width:360px;width:90%}
+.modal h3{font:600 18px var(--serif);margin:0 0 12px}
+.modal p{font:400 14px var(--sans);color:var(--mute);margin:0 0 20px}
+.modal-btns{display:flex;gap:12px;justify-content:flex-end}
+.modal-btns button{font:500 13px var(--sans);padding:8px 18px;border:1px solid var(--ink)}
+.modal-btns .ok{background:var(--accent);color:#fff;border-color:var(--accent)}
+.modal-btns .ok:hover{background:transparent;color:var(--accent)}
+.modal-btns .no{background:transparent}
+.modal-btns .no:hover{background:var(--hi)}
+
 @media (max-width:560px){
   h1{font-size:30px}
   .eqn{gap:14px}
@@ -115,6 +126,17 @@ td.act{font-family:var(--sans);font-size:13px;white-space:nowrap}
   </div>
 </main>
 
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <h3>Hapus baris?</h3>
+    <p>Tindakan ini tidak bisa dibatalkan.</p>
+    <div class="modal-btns">
+      <button class="no" id="modal-no" type="button">Batal</button>
+      <button class="ok" id="modal-ok" type="button">Hapus</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const SYM={'+':'+','-':'−','x':'×','/':'÷'};
 let editId=null,op='+';
@@ -124,15 +146,10 @@ const fmt=n=>String(parseFloat(n.toFixed(6)));
 const DEF='Tekan = untuk menghitung dan menyimpan.';
 
 function say(t,err){const h=$('hint');h.textContent=t;h.className=err?'err':''}
-function setOp(o){op=o;document.querySelectorAll('.op').forEach(b=>b.classList.toggle('on',b.dataset.op===o));live()}
-function live(){
-  const a=parseFloat($('a').value),b=parseFloat($('b').value),el=$('live');
-  const ok=!isNaN(a)&&!isNaN(b)&&!(op==='/'&&b===0);
-  el.textContent=ok?fmt(calc(a,op,b)):'?';el.classList.toggle('ok',ok);
-}
+function setOp(o){op=o;document.querySelectorAll('.op').forEach(b=>b.classList.toggle('on',b.dataset.op===o))}
 function reset(){
   editId=null;$('a').value='';$('b').value='';setOp('+');
-  $('cancel').hidden=true;say(DEF);render();
+  $('cancel').hidden=true;say(DEF);$('live').textContent='?';$('live').classList.remove('ok');render();
 }
 function render(){
   const tbody=$('rows');
@@ -151,6 +168,8 @@ async function submit(){
   if(isNaN(a)||isNaN(b)){say('Isi bilangan 1 dan bilangan 2 dulu.',true);return}
   if(op==='/'&&b===0){say('Tidak bisa membagi dengan nol.',true);return}
   const payload={a,op,b};
+  const result=fmt(calc(a,op,b));
+  $('live').textContent=result;$('live').classList.add('ok');
   if(editId){
     await fetch('/api/ops/'+editId,{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
     say('Baris diperbarui.');
@@ -159,6 +178,7 @@ async function submit(){
       tr.children[0].textContent=a;
       tr.children[1].textContent=SYM[op];
       tr.children[2].textContent=b;
+      tr.children[3].textContent=result;
     }
     reset();
   }else{
@@ -167,12 +187,12 @@ async function submit(){
     say('Tersimpan.');
     const tr=document.createElement('tr');
     tr.dataset.id=saved.id;
-    tr.innerHTML=`<td>${a}</td><td class="c">${SYM[op]}</td><td>${b}</td><td class="res">${fmt(calc(a,op,b))}</td>
+    tr.innerHTML=`<td>${a}</td><td class="c">${SYM[op]}</td><td>${b}</td><td class="res">${result}</td>
       <td class="act"><button class="link" onclick="edit(${saved.id})">edit</button><button class="link del" onclick="del(${saved.id})">hapus</button></td>`;
     const emptyRow=$('rows').querySelector('tr .empty, td.empty');
     if(emptyRow){emptyRow.parentElement.remove()}
     $('rows').prepend(tr);
-    reset();
+    editId=null;$('cancel').hidden=true;
   }
 }
 async function edit(id){
@@ -187,14 +207,27 @@ async function edit(id){
   $('cancel').hidden=false;say('Mengubah satu baris. Tekan = untuk memperbarui.');
   $('a').focus();
 }
-async function del(id){
-  await fetch('/api/ops/'+id,{method:'DELETE'});
-  const tr=$('rows').querySelector(`tr[data-id="${id}"]`);
-  if(tr)tr.remove();
-  if(editId===id)reset();else{say('Baris dihapus.');render()}
+let delId=null;
+function del(id){
+  delId=id;
+  $('modal').style.display='flex';
 }
+function closeModal(){
+  $('modal').style.display='none';
+  delId=null;
+}
+async function confirmDel(){
+  await fetch('/api/ops/'+delId,{method:'DELETE'});
+  const tr=$('rows').querySelector(`tr[data-id="${delId}"]`);
+  if(tr)tr.remove();
+  closeModal();
+  if(editId===delId)reset();else{say('Baris dihapus.');render()}
+}
+$('modal-ok').addEventListener('click',confirmDel);
+$('modal-no').addEventListener('click',closeModal);
+$('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
 document.querySelectorAll('.op').forEach(b=>b.addEventListener('click',()=>setOp(b.dataset.op)));
-[$('a'),$('b')].forEach(el=>{el.addEventListener('input',live);el.addEventListener('keydown',e=>{if(e.key==='Enter')submit()})});
+[$('a'),$('b')].forEach(el=>{el.addEventListener('keydown',e=>{if(e.key==='Enter')submit()})});
 $('eq').addEventListener('click',submit);
 $('cancel').addEventListener('click',reset);
 $('theme').addEventListener('click',()=>{
