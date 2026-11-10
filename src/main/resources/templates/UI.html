@@ -109,23 +109,7 @@ td.act{font-family:var(--sans);font-size:13px;white-space:nowrap}
   <div class="scroll">
     <table>
       <thead><tr><th>Bil 1</th><th class="c">Opt</th><th>Bil 2</th><th>Hasil</th><th>Aksi</th></tr></thead>
-<<<<<<< HEAD
-      <tbody id="rows">
-    <tr th:each="row : ${rows}" th:attr="data-id=${row.id}">
-      <td th:text="${row.a}"></td>
-      <td class="c" th:text="${row.op eq '+' ? '+' : (row.op eq '-' ? '−' : (row.op eq 'x' ? '×' : '÷'))}"></td>
-      <td th:text="${row.b}"></td>
-      <td class="res"></td>
-      <td class="act">
-        <button class="link" data-action="edit" data-id="${row.id}">edit</button>
-        <button class="link del" data-action="del" data-id="${row.id}">hapus</button>
-      </td>
-    </tr>
-    <tr th:if="${#lists.isEmpty(rows)}"><td colspan="5" class="empty">Belum ada catatan.</td></tr>
-  </tbody>
-=======
       <tbody id="rows"></tbody>
->>>>>>> e8cc92e (Final)
     </table>
   </div>
 </main>
@@ -177,42 +161,34 @@ function renderRows(rows){
   $('count').textContent = rows.length + ' baris';
   rows.forEach(row => {
     const tr=document.createElement('tr');
-<<<<<<< HEAD
-    tr.dataset.id=saved.id;
-    tr.innerHTML=`<td>${a}</td><td class="c">${SYM[op]}</td><td>${b}</td><td class="res">${result}</td>
-      <td class="act"><button class="link" data-action="edit" data-id="${saved.id}">edit</button><button class="link del" data-action="del" data-id="${saved.id}">hapus</button></td>`;
-    const emptyRow=$('rows').querySelector('tr .empty, td.empty');
-    if(emptyRow){emptyRow.parentElement.remove()}
-    $('rows').prepend(tr);
-    editId=null;$('cancel').hidden=true;
-=======
     tr.dataset.id=row.id;
     const displayOp = SYM[row.op] || row.op;
     const result = calc(Number(row.a), row.op, Number(row.b));
 
-    tr.innerHTML = `
-      <td>${row.a}</td>
-      <td class="c">${displayOp}</td>
-      <td>${row.b}</td>
-      <td class="res">${fmt(result)}</td>
-      <td class="act">
-        <button class="link" type="button" data-action="edit" data-id="${row.id}">edit</button>
-        <button class="link del" type="button" data-action="delete" data-id="${row.id}">hapus</button>
-      </td>
-    `;
+    const cells = [row.a, displayOp, row.b, fmt(result)];
+    cells.forEach((value, index) => {
+      const td=document.createElement('td');
+      td.textContent=value;
+      if (index === 1) td.className='c';
+      if (index === 3) td.className='res';
+      tr.appendChild(td);
+    });
+
+    const actions=document.createElement('td');
+    actions.className='act';
+    actions.innerHTML='<button class="link" type="button" data-action="edit">edit</button><button class="link del" type="button" data-action="delete">hapus</button>';
+    actions.querySelectorAll('button').forEach(button => {
+      button.dataset.id=row.id;
+    });
+    tr.appendChild(actions);
     tbody.appendChild(tr);
   });
 }
 
 async function refreshHistory(){
-  try {
-    const response=await fetch('/api/ops');
-    const rows=await response.json();
-    renderRows(rows);
-  } catch (error) {
-    say('Gagal memuat riwayat.', true);
->>>>>>> e8cc92e (Final)
-  }
+  const response=await fetch('/api/ops');
+  if (!response.ok) throw new Error('HTTP ' + response.status);
+  renderRows(await response.json());
 }
 
 function reset(){
@@ -246,24 +222,21 @@ async function submit(){
   $('live').classList.add('ok');
 
   try {
-    if (editId) {
-      await fetch('/api/ops/' + editId, {
-        method: 'PUT',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload)
-      });
-      say('Baris diperbarui.');
-    } else {
-      await fetch('/api/ops', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload)
-      });
-      say('Tersimpan.');
-    }
+    const response=await fetch(editId ? '/api/ops/' + editId : '/api/ops', {
+      method: editId ? 'PUT' : 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(payload)
+    });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
 
-    await refreshHistory();
+    const message=editId ? 'Baris diperbarui.' : 'Tersimpan.';
     reset();
+    try {
+      await refreshHistory();
+      say(message);
+    } catch (error) {
+      say(message + ' Riwayat gagal dimuat ulang.', true);
+    }
   } catch (error) {
     say('Gagal menyimpan data.', true);
   }
@@ -297,39 +270,23 @@ async function confirmDelete(){
   if (!deleteId) return;
 
   try {
-    await fetch('/api/ops/' + deleteId, { method: 'DELETE' });
+    const response=await fetch('/api/ops/' + deleteId, { method: 'DELETE' });
+    if (!response.ok) throw new Error('HTTP ' + response.status);
     if (editId === deleteId) {
       reset();
     }
-    await refreshHistory();
-    say('Baris dihapus.');
     closeModal();
+    try {
+      await refreshHistory();
+      say('Baris dihapus.');
+    } catch (error) {
+      say('Baris dihapus, tetapi riwayat gagal dimuat ulang.', true);
+    }
   } catch (error) {
     say('Gagal menghapus data.', true);
     closeModal();
   }
 }
-<<<<<<< HEAD
-$('modal-ok').addEventListener('click',confirmDel);
-$('modal-no').addEventListener('click',closeModal);
-$('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
-document.addEventListener('click',e=>{
-  const btn=e.target.closest('[data-action]');
-  if(!btn)return;
-  const id=btn.dataset.id;
-  if(btn.dataset.action==='edit')edit(id);
-  else if(btn.dataset.action==='del')del(id);
-});
-document.querySelectorAll('.op').forEach(b=>b.addEventListener('click',()=>setOp(b.dataset.op)));
-[$('a'),$('b')].forEach(el=>{el.addEventListener('keydown',e=>{if(e.key==='Enter')submit()})});
-$('eq').addEventListener('click',submit);
-$('cancel').addEventListener('click',reset);
-$('theme').addEventListener('click',()=>{
-  const r=document.documentElement;
-  const dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
-  r.dataset.theme=dark?'light':'dark';
-=======
-
 document.addEventListener('click', (event) => {
   const btn = event.target.closest('button[data-action]');
   if (!btn) return;
@@ -337,12 +294,9 @@ document.addEventListener('click', (event) => {
   const id = Number(btn.dataset.id);
   if (btn.dataset.action === 'edit') {
     edit(id);
-  }
-
-  if (btn.dataset.action === 'delete') {
+  } else if (btn.dataset.action === 'delete') {
     openDeleteModal(id);
   }
->>>>>>> e8cc92e (Final)
 });
 
 document.querySelectorAll('.op').forEach(button => {
@@ -369,7 +323,7 @@ $('theme').addEventListener('click', () => {
 });
 
 reset();
-refreshHistory();
+refreshHistory().catch(() => say('Gagal memuat riwayat.', true));
 </script>
 </body>
 </html>
